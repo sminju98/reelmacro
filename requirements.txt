@@ -1,0 +1,54 @@
+# 웹 프레임워크
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# 데이터베이스
+sqlalchemy==2.0.23
+alembic==1.12.1
+psycopg2-binary==2.9.9
+asyncpg==0.29.0
+
+# Redis & 캐싱
+redis==5.0.1
+hiredis==2.2.3
+
+# 작업 큐
+celery==5.3.4
+
+# HTTP 클라이언트
+httpx==0.25.2
+aiohttp==3.9.1
+
+# 데이터 검증
+pydantic==2.5.2
+pydantic-settings==2.1.0
+email-validator==2.1.0
+
+# 인증 & 보안
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.1
+python-dotenv==1.0.0
+
+# AI & 외부 API
+openai==1.3.9
+elevenlabs==0.2.26
+
+# 영상 처리
+moviepy==1.0.3
+Pillow==10.1.0
+opencv-python==4.8.1.78
+numpy==1.26.2
+
+# 이미지 처리
+requests==2.31.0
+
+# 로깅 & 모니터링
+python-json-logger==2.0.7
+sentry-sdk[fastapi]==1.38.0
+
+# 유틸리티
+python-slugify==8.0.1
+pytz==2023.3.post1
+
