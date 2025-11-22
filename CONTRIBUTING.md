@@ -56,8 +56,8 @@ Reel Maker AI 프로젝트에 기여해주셔서 감사합니다! 🎉
 ```bash
 # 저장소 Fork (GitHub에서)
 # 그 후 Clone
-git clone https://github.com/YOUR_USERNAME/macro.git
-cd macro
+git clone https://github.com/YOUR_USERNAME/reelmacro.git
+cd reelmacro
 ```
 
 #### Step 2: 환경 설정
@@ -535,7 +535,7 @@ GitHub Issues와 PRs에 사용하는 라벨:
 ## 💬 커뮤니티
 
 - **Discord**: [Join our community](https://discord.gg/reelmaker)
-- **GitHub Discussions**: [Discussions](https://github.com/yourusername/macro/discussions)
+- **GitHub Discussions**: [Discussions](https://github.com/sminju98/reelmacro/discussions)
 - **Email**: support@reelmaker.ai
 
 ## 📜 행동 강령
@@ -555,5 +555,5 @@ GitHub Issues와 PRs에 사용하는 라벨:
 
 ---
 
-**질문이 있으신가요?** [GitHub Discussions](https://github.com/yourusername/macro/discussions)에서 물어보세요!
+**질문이 있으신가요?** [GitHub Discussions](https://github.com/sminju98/reelmacro/discussions)에서 물어보세요!
 

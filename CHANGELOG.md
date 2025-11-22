@@ -71,6 +71,6 @@
 
 ---
 
-[Unreleased]: https://github.com/yourusername/macro/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/yourusername/macro/releases/tag/v0.1.0
+[Unreleased]: https://github.com/sminju98/reelmacro/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/sminju98/reelmacro/releases/tag/v0.1.0
 

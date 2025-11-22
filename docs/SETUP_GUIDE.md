@@ -47,8 +47,8 @@
 ### 1. 저장소 클론
 
 ```bash
-git clone https://github.com/yourusername/macro.git
-cd macro
+git clone https://github.com/sminju98/reelmacro.git
+cd reelmacro
 ```
 
 ### 2. 가상환경 생성 및 활성화
@@ -377,7 +377,7 @@ pre-commit run --all-files
 
 ## 📞 도움이 필요하신가요?
 
-- **GitHub Issues**: [Issues](https://github.com/yourusername/macro/issues)
+- **GitHub Issues**: [Issues](https://github.com/sminju98/reelmacro/issues)
 - **Discord**: [Join our community](https://discord.gg/reelmaker)
 - **이메일**: support@reelmaker.ai
 

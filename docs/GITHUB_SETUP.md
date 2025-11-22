@@ -17,7 +17,7 @@
 1. GitHub 웹사이트 접속: https://github.com
 2. 우측 상단 `+` 버튼 클릭 → `New repository` 선택
 3. 저장소 설정:
-   - **Repository name**: `macro` (또는 원하는 이름)
+   - **Repository name**: `reelmacro`
    - **Description**: `🎬 AI 기반 인스타그램 릴스 자동 생성 프로그램`
    - **Public/Private**: 원하는 옵션 선택
    - **Initialize this repository**: 체크하지 않음 (이미 로컬에 있음)
@@ -29,7 +29,7 @@ GitHub에서 저장소를 만들면 다음과 같은 화면이 나타납니다. 
 
 ```bash
 # GitHub 저장소를 원격 저장소로 추가
-git remote add origin https://github.com/YOUR_USERNAME/macro.git
+git remote add origin https://github.com/YOUR_USERNAME/reelmacro.git
 
 # 원격 저장소 확인
 git remote -v
@@ -67,7 +67,7 @@ cat ~/.ssh/id_ed25519.pub
 
 ```bash
 # SSH URL로 변경
-git remote set-url origin git@github.com:YOUR_USERNAME/macro.git
+git remote set-url origin git@github.com:YOUR_USERNAME/reelmacro.git
 
 # 확인
 git remote -v
@@ -359,7 +359,7 @@ cat ~/.ssh/id_ed25519.pub
 
 ---
 
-**GitHub 저장소**: https://github.com/YOUR_USERNAME/macro
+**GitHub 저장소**: https://github.com/sminju98/reelmacro
 
 **문제가 있으면 Issue를 생성해주세요!** 🙏
 

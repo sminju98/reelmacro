@@ -36,8 +36,8 @@ Reel Maker AI는 최신 키워드를 입력하면 AI가 자동으로 대본을 �
 
 ```bash
 # 저장소 클론
-git clone https://github.com/yourusername/macro.git
-cd macro
+git clone https://github.com/sminju98/reelmacro.git
+cd reelmacro
 
 # 가상환경 생성 및 활성화
 python -m venv venv
@@ -172,7 +172,7 @@ curl -X POST http://localhost:8000/v1/projects \
 ## 🏗️ 프로젝트 구조
 
 ```
-macro/
+reelmacro/
 ├── src/                    # 소스 코드
 │   ├── api/               # API 라우터
 │   ├── core/              # 핵심 설정
@@ -302,7 +302,7 @@ pytest tests/unit/test_content_service.py
 ## 📧 문의
 
 - **이메일**: support@reelmaker.ai
-- **GitHub Issues**: [Issues](https://github.com/yourusername/macro/issues)
+- **GitHub Issues**: [Issues](https://github.com/sminju98/reelmacro/issues)
 - **Discord**: [Join our community](https://discord.gg/reelmaker)
 
 ## 🙏 감사의 말

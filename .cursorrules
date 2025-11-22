@@ -79,7 +79,7 @@ async def generate_script(keyword: str, length: int = 30) -> dict[str, Any]:
 
 ### 파일 구조
 ```
-macro/
+reelmacro/
 ├── src/
 │   ├── content/          # 콘텐츠 수집 모듈
 │   ├── media/            # 미디어 처리 모듈
