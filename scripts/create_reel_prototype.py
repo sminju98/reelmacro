@@ -250,6 +250,67 @@ class ReelMakerPrototype:
             print(f"❌ 음성 생성 실패: {str(e)}")
             return None
     
+    def create_subtitles(self, script: str, duration: float) -> list:
+        """
+        대본에서 자막 생성 (타이밍 포함)
+        
+        Args:
+            script: 대본 텍스트
+            duration: 총 영상 길이
+        
+        Returns:
+            자막 정보 리스트 [{text, start, end}]
+        """
+        print(f"\n✍️  자막 생성 중...")
+        
+        # 대본을 문장 단위로 분리
+        sentences = []
+        for line in script.split('\n'):
+            line = line.strip()
+            # 장면 마커나 이미지 키워드 제외
+            if line and not line.startswith('[') and not line.startswith('장면') and not line.startswith('-'):
+                # 긴 문장은 쉼표나 마침표로 분리
+                if '.' in line:
+                    parts = [p.strip() + '.' for p in line.split('.') if p.strip()]
+                    sentences.extend(parts)
+                else:
+                    sentences.append(line)
+        
+        # 빈 문장 제거 및 정리
+        sentences = [s for s in sentences if len(s) > 5]
+        
+        if not sentences:
+            sentences = ["자막 없음"]
+        
+        # 각 문장의 길이에 비례하여 시간 할당
+        total_chars = sum(len(s) for s in sentences)
+        
+        subtitles = []
+        current_time = 0
+        
+        for i, sentence in enumerate(sentences):
+            if i >= 10:  # 최대 10개 자막만
+                break
+            
+            # 문장 길이에 비례한 시간 계산
+            sentence_ratio = len(sentence) / total_chars if total_chars > 0 else 1 / len(sentences)
+            sentence_duration = duration * sentence_ratio
+            
+            # 최소 2초, 최대 8초
+            sentence_duration = max(2, min(8, sentence_duration))
+            
+            subtitles.append({
+                'text': sentence,
+                'start': current_time,
+                'end': current_time + sentence_duration
+            })
+            
+            current_time += sentence_duration
+        
+        print(f"✅ 자막 {len(subtitles)}개 생성 완료!")
+        
+        return subtitles
+    
     def create_video(
         self, 
         images: list, 
@@ -258,7 +319,7 @@ class ReelMakerPrototype:
         output_path: Path
     ) -> str:
         """
-        MoviePy로 영상 생성
+        FFmpeg로 영상 생성 (자막 포함)
         
         Args:
             images: 이미지 파일 경로 리스트
@@ -376,13 +437,51 @@ class ReelMakerPrototype:
                 print(f"❌ 영상 생성 실패: {result.stderr}")
                 return None
             
-            # 3. 음성 추가
+            # 3. 자막 생성
+            subtitles = self.create_subtitles(script, total_duration)
+            
+            # 4. SRT 자막 파일 생성
+            srt_file = TEMP_DIR / "subtitles.srt"
+            with open(srt_file, 'w', encoding='utf-8') as f:
+                for i, sub in enumerate(subtitles, 1):
+                    # SRT 형식
+                    start_time = self._format_time(sub['start'])
+                    end_time = self._format_time(sub['end'])
+                    
+                    f.write(f"{i}\n")
+                    f.write(f"{start_time} --> {end_time}\n")
+                    f.write(f"{sub['text']}\n")
+                    f.write("\n")
+            
+            print("✅ SRT 자막 파일 생성 완료!")
+            
+            # 5. 음성 및 자막 추가
             if audio_path and os.path.exists(audio_path):
+                print("🎙️  음성 및 자막 추가 중...")
+                
+                # 한국어 폰트 경로 (macOS 기본 폰트)
+                font_path = "/System/Library/Fonts/Supplemental/AppleGothic.ttf"
+                
+                # 자막 스타일 설정
+                subtitle_filter = (
+                    f"subtitles={srt_file}:force_style='"
+                    f"FontName=AppleSDGothicNeo-Bold,"
+                    f"FontSize=32,"
+                    f"PrimaryColour=&HFFFFFF&,"  # 흰색
+                    f"OutlineColour=&H000000&,"  # 검은색 테두리
+                    f"Outline=3,"  # 테두리 두께
+                    f"Shadow=2,"  # 그림자
+                    f"Alignment=2,"  # 하단 중앙
+                    f"MarginV=80"  # 하단 여백
+                    f"'"
+                )
+                
                 cmd = [
                     'ffmpeg', '-y',
                     '-i', str(temp_video),
                     '-i', audio_path,
-                    '-c:v', 'copy',
+                    '-vf', subtitle_filter,
+                    '-c:v', 'libx264',
                     '-c:a', 'aac',
                     '-shortest',
                     str(output_path)
@@ -391,10 +490,18 @@ class ReelMakerPrototype:
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 
                 if result.returncode != 0:
-                    print(f"❌ 음성 추가 실패: {result.stderr}")
-                    # 음성 없이라도 저장
-                    import shutil
-                    shutil.copy(temp_video, output_path)
+                    print(f"❌ 자막 추가 실패: {result.stderr[:200]}")
+                    # 자막 없이 음성만 추가
+                    cmd = [
+                        'ffmpeg', '-y',
+                        '-i', str(temp_video),
+                        '-i', audio_path,
+                        '-c:v', 'copy',
+                        '-c:a', 'aac',
+                        '-shortest',
+                        str(output_path)
+                    ]
+                    subprocess.run(cmd, capture_output=True, text=True)
             else:
                 # 음성 없이 저장
                 import shutil
@@ -409,6 +516,7 @@ class ReelMakerPrototype:
             try:
                 os.remove(temp_video)
                 os.remove(concat_file)
+                os.remove(srt_file)
             except:
                 pass
             
@@ -416,12 +524,30 @@ class ReelMakerPrototype:
             print(f"📁 저장 위치: {output_path}")
             
             return str(output_path)
+    
             
         except Exception as e:
             print(f"❌ 영상 생성 실패: {str(e)}")
             import traceback
             traceback.print_exc()
             return None
+    
+    def _format_time(self, seconds: float) -> str:
+        """
+        초를 SRT 시간 형식으로 변환
+        
+        Args:
+            seconds: 초 단위 시간
+        
+        Returns:
+            HH:MM:SS,mmm 형식 문자열
+        """
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        millis = int((seconds % 1) * 1000)
+        
+        return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
     
     def create_reel(self, keyword: str, duration: int = 30) -> str:
         """
