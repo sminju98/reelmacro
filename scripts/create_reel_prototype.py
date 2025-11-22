@@ -115,6 +115,45 @@ class ReelMakerPrototype:
             print(f"❌ 대본 생성 실패: {str(e)}")
             raise
     
+    def translate_keyword(self, keyword: str) -> str:
+        """
+        한국어 키워드를 영어로 번역 (이미지 검색용)
+        
+        Args:
+            keyword: 한국어 키워드
+        
+        Returns:
+            영어 키워드
+        """
+        try:
+            from openai import OpenAI
+            
+            client = OpenAI(api_key=self.openai_key)
+            
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "당신은 번역가입니다. 주어진 한국어 키워드를 영어로 번역하세요. 이미지 검색에 최적화된 간단한 영어 단어로 번역하세요."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"다음 키워드를 영어로 번역하세요: {keyword}\n\n짧은 영어 키워드만 반환하세요."
+                    }
+                ],
+                max_tokens=20,
+                temperature=0.3
+            )
+            
+            translated = response.choices[0].message.content.strip()
+            print(f"  🌐 번역: '{keyword}' → '{translated}'")
+            return translated
+            
+        except:
+            # 번역 실패 시 원본 반환
+            return keyword
+    
     def search_images(self, keyword: str, count: int = 5) -> list:
         """
         Unsplash에서 이미지 검색
@@ -128,9 +167,14 @@ class ReelMakerPrototype:
         """
         print(f"\n🖼️  2단계: 이미지 검색 중... ('{keyword}')")
         
+        # 한국어 키워드면 영어로 번역
+        search_keyword = keyword
+        if any('\uac00' <= char <= '\ud7a3' for char in keyword):
+            search_keyword = self.translate_keyword(keyword)
+        
         try:
             params = {
-                "query": keyword,
+                "query": search_keyword,
                 "per_page": count,
                 "client_id": self.unsplash_key,
                 "orientation": "portrait"  # 세로 이미지 우선
@@ -197,22 +241,105 @@ class ReelMakerPrototype:
         
         return downloaded
     
-    def generate_voice(self, text: str, output_path: Path) -> str:
+    def select_voice_by_concept(self, keyword: str, script: str) -> dict:
+        """
+        GPT가 컨셉에 맞는 음성을 자동 선택
+        
+        Args:
+            keyword: 키워드
+            script: 대본
+        
+        Returns:
+            음성 정보 딕셔너리
+        """
+        print(f"\n🎤 음성 선택 중...")
+        
+        try:
+            from openai import OpenAI
+            
+            client = OpenAI(api_key=self.openai_key)
+            
+            prompt = f"""
+다음 릴스 컨셉에 가장 어울리는 음성을 선택해주세요.
+
+키워드: {keyword}
+대본 일부: {script[:200]}...
+
+사용 가능한 음성:
+1. Sarah (cute) - 밝고 귀여운 여성 목소리, 뷰티/패션/일상 콘텐츠에 적합
+2. Rachel (calm) - 차분하고 지적인 여성 목소리, 교육/뉴스 콘텐츠에 적합
+3. Adam (energetic) - 활기차고 역동적인 남성 목소리, 스포츠/동기부여 콘텐츠에 적합
+4. Bella (friendly) - 친근하고 따뜻한 여성 목소리, 브이로그/일상 콘텐츠에 적합
+5. Antoni (professional) - 전문적인 남성 목소리, 비즈니스/기술 콘텐츠에 적합
+
+출력 형식 (JSON):
+{{"voice": "Sarah", "reason": "뷰티 콘텐츠라서 밝고 귀여운 톤이 적합"}}
+"""
+            
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "당신은 음성 디렉터입니다. 컨셉에 가장 어울리는 음성을 선택하세요."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=100,
+                temperature=0.3
+            )
+            
+            import json
+            result_text = response.choices[0].message.content.strip()
+            
+            # JSON 추출
+            if '{' in result_text and '}' in result_text:
+                json_start = result_text.index('{')
+                json_end = result_text.rindex('}') + 1
+                result = json.loads(result_text[json_start:json_end])
+                
+                selected_voice = result.get("voice", "Sarah")
+                reason = result.get("reason", "자동 선택")
+                
+                print(f"  ✅ 선택된 음성: {selected_voice}")
+                print(f"  💡 이유: {reason}")
+                
+                return {"voice": selected_voice, "reason": reason}
+            
+        except Exception as e:
+            print(f"  ⚠️  자동 선택 실패, 기본 음성 사용: {str(e)}")
+        
+        # 기본값
+        return {"voice": "Sarah", "reason": "기본 음성"}
+    
+    def generate_voice(self, text: str, output_path: Path, voice_name: str = "Sarah") -> str:
         """
         ElevenLabs로 음성 생성
         
         Args:
             text: 대본 텍스트
             output_path: 저장 경로
+            voice_name: 음성 이름
         
         Returns:
             음성 파일 경로
         """
-        print(f"\n🎙️  4단계: 음성 생성 중...")
+        print(f"\n🎙️  4단계: 음성 생성 중... (음성: {voice_name})")
         
         try:
-            # 기본 음성 ID (ElevenLabs의 기본 음성)
-            voice_id = "21m00Tcm4TlvDq8ikWAM"  # Rachel
+            # 음성 ID 매핑
+            voice_map = {
+                "Sarah": "EXAVITQu4vr4xnSDxMaL",      # 밝고 귀여운 여성
+                "Rachel": "21m00Tcm4TlvDq8ikWAM",     # 차분한 여성
+                "Adam": "pNInz6obpgDQGcFmaJgB",       # 활기찬 남성
+                "Bella": "EXAVITQu4vr4xnSDxMaL",      # 친근한 여성 (Sarah와 동일)
+                "Antoni": "ErXwobaYiN019PkySvjV"      # 전문적인 남성
+            }
+            
+            voice_id = voice_map.get(voice_name, voice_map["Sarah"])
             
             url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
             
@@ -225,8 +352,10 @@ class ReelMakerPrototype:
                 "text": text,
                 "model_id": "eleven_multilingual_v2",
                 "voice_settings": {
-                    "stability": 0.5,
-                    "similarity_boost": 0.75
+                    "stability": 0.3,          # 낮을수록 더 밝고 귀여운 톤
+                    "similarity_boost": 0.85,  # 높을수록 더 표현력 있음
+                    "style": 0.5,              # 스타일 강도
+                    "use_speaker_boost": True  # 목소리 강화
                 }
             }
             
@@ -252,7 +381,7 @@ class ReelMakerPrototype:
     
     def create_subtitles(self, script: str, duration: float) -> list:
         """
-        대본에서 자막 생성 (타이밍 포함)
+        대본에서 핵심 자막 생성 (타이밍 포함)
         
         Args:
             script: 대본 텍스트
@@ -263,49 +392,66 @@ class ReelMakerPrototype:
         """
         print(f"\n✍️  자막 생성 중...")
         
-        # 대본을 문장 단위로 분리
-        sentences = []
-        for line in script.split('\n'):
-            line = line.strip()
-            # 장면 마커나 이미지 키워드 제외
-            if line and not line.startswith('[') and not line.startswith('장면') and not line.startswith('-'):
-                # 긴 문장은 쉼표나 마침표로 분리
-                if '.' in line:
-                    parts = [p.strip() + '.' for p in line.split('.') if p.strip()]
-                    sentences.extend(parts)
-                else:
-                    sentences.append(line)
+        # GPT로 핵심 문장만 추출
+        try:
+            from openai import OpenAI
+            
+            client = OpenAI(api_key=self.openai_key)
+            
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "대본에서 릴스 자막으로 적합한 핵심 문장 3-5개만 추출하세요. 각 문장은 짧고 임팩트 있어야 합니다."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"다음 대본에서 자막으로 쓸 핵심 문장 3-5개만 추출해주세요:\n\n{script}\n\n출력 형식: 한 줄에 하나씩, 번호 없이"
+                    }
+                ],
+                max_tokens=200,
+                temperature=0.3
+            )
+            
+            subtitle_text = response.choices[0].message.content.strip()
+            sentences = [s.strip() for s in subtitle_text.split('\n') if s.strip()]
+            
+        except:
+            # GPT 실패 시 대본에서 직접 추출
+            sentences = []
+            for line in script.split('\n'):
+                line = line.strip()
+                if line and not line.startswith('[') and not line.startswith('장면') and not line.startswith('-') and not line.startswith('이미지:'):
+                    if '?' in line or '!' in line or len(line) > 10:
+                        sentences.append(line)
+                        if len(sentences) >= 5:
+                            break
         
-        # 빈 문장 제거 및 정리
-        sentences = [s for s in sentences if len(s) > 5]
+        # 최대 5개로 제한
+        sentences = sentences[:5]
         
         if not sentences:
-            sentences = ["자막 없음"]
+            sentences = ["자막을 생성할 수 없습니다"]
         
-        # 각 문장의 길이에 비례하여 시간 할당
-        total_chars = sum(len(s) for s in sentences)
+        # 각 자막에 균등하게 시간 할당
+        time_per_subtitle = duration / len(sentences)
         
         subtitles = []
         current_time = 0
         
-        for i, sentence in enumerate(sentences):
-            if i >= 10:  # 최대 10개 자막만
-                break
-            
-            # 문장 길이에 비례한 시간 계산
-            sentence_ratio = len(sentence) / total_chars if total_chars > 0 else 1 / len(sentences)
-            sentence_duration = duration * sentence_ratio
-            
-            # 최소 2초, 최대 8초
-            sentence_duration = max(2, min(8, sentence_duration))
+        for sentence in sentences:
+            # 문장이 너무 길면 줄여서
+            if len(sentence) > 50:
+                sentence = sentence[:47] + "..."
             
             subtitles.append({
                 'text': sentence,
                 'start': current_time,
-                'end': current_time + sentence_duration
+                'end': current_time + time_per_subtitle
             })
             
-            current_time += sentence_duration
+            current_time += time_per_subtitle
         
         print(f"✅ 자막 {len(subtitles)}개 생성 완료!")
         
@@ -330,7 +476,7 @@ class ReelMakerPrototype:
         Returns:
             생성된 영상 파일 경로
         """
-        print(f"\n🎬 5단계: 영상 합성 중...")
+        print(f"\n🎬 6단계: 영상 합성 중...")
         
         try:
             from PIL import Image
@@ -406,17 +552,41 @@ class ReelMakerPrototype:
             
             print("\n🎥 FFmpeg으로 영상 생성 중...")
             
-            # FFmpeg 명령어로 슬라이드쇼 생성
-            # 1. 이미지 리스트 파일 생성
+            # 각 이미지를 영상 클립으로 변환
+            video_clips = []
+            for i, img_path in enumerate(resized_images):
+                clip_path = TEMP_DIR / f"clip_{i}.mp4"
+                
+                # 이미지를 지정된 길이의 영상으로 변환
+                cmd = [
+                    'ffmpeg', '-y',
+                    '-loop', '1',
+                    '-i', img_path,
+                    '-t', str(time_per_image),
+                    '-vf', 'fps=30,format=yuv420p',
+                    '-c:v', 'libx264',
+                    '-preset', 'medium',
+                    '-crf', '23',
+                    str(clip_path)
+                ]
+                
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                
+                if result.returncode == 0:
+                    video_clips.append(str(clip_path))
+                else:
+                    print(f"  ✗ 클립 {i+1} 생성 실패")
+            
+            if not video_clips:
+                print("❌ 생성된 영상 클립이 없습니다!")
+                return None
+            
+            # 2. 모든 클립을 하나로 합치기
             concat_file = TEMP_DIR / "concat_list.txt"
             with open(concat_file, 'w') as f:
-                for img_path in resized_images:
-                    f.write(f"file '{img_path}'\n")
-                    f.write(f"duration {time_per_image}\n")
-                # 마지막 이미지는 duration 없이
-                f.write(f"file '{resized_images[-1]}'\n")
+                for clip_path in video_clips:
+                    f.write(f"file '{clip_path}'\n")
             
-            # 2. FFmpeg로 영상 생성
             temp_video = TEMP_DIR / "temp_video.mp4"
             
             cmd = [
@@ -424,18 +594,17 @@ class ReelMakerPrototype:
                 '-f', 'concat',
                 '-safe', '0',
                 '-i', str(concat_file),
-                '-vf', 'fps=30,format=yuv420p',
-                '-c:v', 'libx264',
-                '-preset', 'medium',
-                '-crf', '23',
+                '-c', 'copy',
                 str(temp_video)
             ]
             
             result = subprocess.run(cmd, capture_output=True, text=True)
             
             if result.returncode != 0:
-                print(f"❌ 영상 생성 실패: {result.stderr}")
+                print(f"❌ 영상 합치기 실패: {result.stderr[:200]}")
                 return None
+            
+            print("✅ 영상 클립 생성 및 합치기 완료!")
             
             # 3. 자막 생성
             subtitles = self.create_subtitles(script, total_duration)
@@ -462,17 +631,17 @@ class ReelMakerPrototype:
                 # 한국어 폰트 경로 (macOS 기본 폰트)
                 font_path = "/System/Library/Fonts/Supplemental/AppleGothic.ttf"
                 
-                # 자막 스타일 설정
+                # 자막 스타일 설정 (작고 하단에 표시)
                 subtitle_filter = (
                     f"subtitles={srt_file}:force_style='"
                     f"FontName=AppleSDGothicNeo-Bold,"
-                    f"FontSize=32,"
+                    f"FontSize=24,"              # 작은 크기
                     f"PrimaryColour=&HFFFFFF&,"  # 흰색
                     f"OutlineColour=&H000000&,"  # 검은색 테두리
-                    f"Outline=3,"  # 테두리 두께
-                    f"Shadow=2,"  # 그림자
-                    f"Alignment=2,"  # 하단 중앙
-                    f"MarginV=80"  # 하단 여백
+                    f"Outline=2,"                # 테두리 두께 줄임
+                    f"Shadow=1,"                 # 그림자 줄임
+                    f"Alignment=2,"              # 하단 중앙
+                    f"MarginV=50"                # 하단 여백 줄임 (더 아래로)
                     f"'"
                 )
                 
@@ -513,10 +682,20 @@ class ReelMakerPrototype:
                     os.remove(img)
                 except:
                     pass
+            
+            # 클립 파일들도 정리
+            if 'video_clips' in locals():
+                for clip in video_clips:
+                    try:
+                        os.remove(clip)
+                    except:
+                        pass
+            
             try:
                 os.remove(temp_video)
                 os.remove(concat_file)
-                os.remove(srt_file)
+                if 'srt_file' in locals():
+                    os.remove(srt_file)
             except:
                 pass
             
@@ -549,7 +728,7 @@ class ReelMakerPrototype:
         
         return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
     
-    def create_reel(self, keyword: str, duration: int = 30) -> str:
+    def create_reel(self, keyword: str, duration: int = 30, voice_style: str = "cute") -> str:
         """
         전체 릴스 생성 프로세스
         
@@ -580,7 +759,10 @@ class ReelMakerPrototype:
                 print("❌ 다운로드된 이미지가 없습니다!")
                 return None
             
-            # 4. 음성 생성
+            # 4. GPT가 컨셉에 맞는 음성 선택
+            voice_info = self.select_voice_by_concept(keyword, script_data["script"])
+            
+            # 5. 음성 생성
             audio_path = TEMP_DIR / "voice.mp3"
             
             # 대본에서 실제 텍스트만 추출 (간단하게)
@@ -589,17 +771,17 @@ class ReelMakerPrototype:
             clean_text = []
             for line in script_text.split('\n'):
                 if not line.strip().startswith('[') and not line.strip().startswith('장면'):
-                    if line.strip() and not line.strip().startswith('-'):
+                    if line.strip() and not line.strip().startswith('-') and not line.strip().startswith('이미지:'):
                         clean_text.append(line.strip())
             
-            voice_text = ' '.join(clean_text[:5])  # 처음 5줄만 (비용 절약)
+            voice_text = ' '.join(clean_text[:8])  # 처음 8줄
             
             if len(voice_text) < 10:
                 voice_text = f"{keyword}에 대한 이야기입니다. 자세한 내용을 알아보겠습니다."
             
-            voice_path = self.generate_voice(voice_text, audio_path)
+            voice_path = self.generate_voice(voice_text, audio_path, voice_info["voice"])
             
-            # 5. 영상 합성
+            # 6. 영상 합성
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_filename = f"reel_{keyword}_{timestamp}.mp4"
             output_path = OUTPUT_DIR / output_filename
